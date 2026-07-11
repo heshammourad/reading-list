@@ -28,6 +28,23 @@ export async function getSeriesList() {
   });
 }
 
+export async function getSeriesBooks(seriesId: number, excludeBookId?: number) {
+  if (!seriesId) return [];
+  const books = await prisma.books.findMany({
+    where: {
+      series_id: seriesId,
+      id: excludeBookId ? { not: excludeBookId } : undefined,
+    },
+    orderBy: { series_order: "asc" },
+  });
+  return books.map(b => ({
+    name: b.name,
+    author: b.author,
+    seriesOrder: b.series_order ? Number(b.series_order) : 0,
+    status: b.status || "Unread",
+  }));
+}
+
 export async function createSeries(name: string) {
   if (!name.trim()) throw new Error("Series name is required");
   
@@ -73,8 +90,33 @@ export async function saveBookSeries(
 
 export async function addSeriesBooks(
   seriesId: number,
-  booksList: { name: string; author: string; seriesOrder: number; status: string }[]
+  booksList: { name: string; author: string; seriesOrder: number; status: string }[],
+  excludeBookId?: number
 ) {
+  // 1. Unlink any books currently in the series that are NOT in the new list (and not the excluded main book)
+  const currentBooks = await prisma.books.findMany({
+    where: { 
+      series_id: seriesId,
+      id: excludeBookId ? { not: excludeBookId } : undefined
+    },
+  });
+
+  const keepNames = new Set(booksList.map(b => `${b.name.trim().toLowerCase()}|${b.author.trim().toLowerCase()}`));
+
+  for (const cb of currentBooks) {
+    const key = `${cb.name.toLowerCase()}|${cb.author.toLowerCase()}`;
+    if (!keepNames.has(key)) {
+      await prisma.books.update({
+        where: { id: cb.id },
+        data: {
+          series_id: null,
+          series_order: null,
+        },
+      });
+    }
+  }
+
+  // 2. Add/update the books in the list
   for (const b of booksList) {
     if (!b.name.trim() || !b.author.trim()) continue;
     

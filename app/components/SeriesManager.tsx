@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition, useRef } from "react";
-import { getSeriesList, createSeries, saveBookSeries, addSeriesBooks, searchExistingBooks } from "@/app/actions";
+import { getSeriesList, createSeries, saveBookSeries, addSeriesBooks, searchExistingBooks, getSeriesBooks } from "@/app/actions";
 
 interface SeriesManagerProps {
   isOpen: boolean;
@@ -61,9 +61,22 @@ export default function SeriesManager({
       setSelectedSeriesId(currentSeriesId ? currentSeriesId.toString() : "");
       setSeriesOrder(currentSeriesOrder ? currentSeriesOrder.toString() : "");
       setNewSeriesName("");
-      setNewBooks([]);
     }
   }, [isOpen, currentSeriesId, currentSeriesOrder]);
+
+  // Load other books in the series when selectedSeriesId changes
+  useEffect(() => {
+    if (isOpen) {
+      const sId = selectedSeriesId && selectedSeriesId !== "new" ? parseInt(selectedSeriesId, 10) : null;
+      if (sId && !isNaN(sId)) {
+        getSeriesBooks(sId, bookId)
+          .then(setNewBooks)
+          .catch(console.error);
+      } else {
+        setNewBooks([]);
+      }
+    }
+  }, [selectedSeriesId, isOpen, bookId]);
 
   if (!isOpen) return null;
 
@@ -152,15 +165,15 @@ export default function SeriesManager({
         // Save current book series details
         await saveBookSeries(bookId, finalSeriesId, parsedOrder);
 
-        // Add additional books in the series if specified
-        if (finalSeriesId && newBooks.length > 0) {
+        // Add/update/remove additional books in the series
+        if (finalSeriesId) {
           const booksToSend = newBooks.map((b) => ({
             name: b.name,
             author: b.author,
             seriesOrder: b.seriesOrder,
             status: b.status,
           }));
-          await addSeriesBooks(finalSeriesId, booksToSend);
+          await addSeriesBooks(finalSeriesId, booksToSend, bookId);
         }
 
         onClose();
