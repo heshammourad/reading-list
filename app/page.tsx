@@ -93,17 +93,25 @@ export default async function Home({ searchParams }: PageProps) {
 
   let books: any[] = [];
   let totalEntries = 0;
+  let latestChartBookIds: number[] = [];
 
   try {
-    const [booksRes, countRes] = await Promise.all([
+    const [booksRes, countRes, latestChartsRes] = await Promise.all([
       prisma.$queryRawUnsafe<any[]>(query, ...params),
       prisma.$queryRawUnsafe<{ count: number }[]>(countQuery, ...countParams),
+      prisma.$queryRawUnsafe<{ book_id: number }[]>(`
+        SELECT DISTINCT book_id 
+        FROM charts 
+        WHERE date = (SELECT MAX(date) FROM charts) 
+          AND book_id IS NOT NULL
+      `),
     ]);
     books = booksRes.map(b => ({
       ...b,
       series_order: b.series_order ? Number(b.series_order) : null
     }));
     totalEntries = countRes[0]?.count ?? 0;
+    latestChartBookIds = latestChartsRes.map(c => c.book_id);
   } catch (err: any) {
     console.error("Database query failed:", err.message);
   }
@@ -160,6 +168,7 @@ export default async function Home({ searchParams }: PageProps) {
           seriesMap={seriesMap}
           offset={offset}
           statusFilter={status}
+          latestChartBookIds={latestChartBookIds}
         />
 
         {/* Pagination */}

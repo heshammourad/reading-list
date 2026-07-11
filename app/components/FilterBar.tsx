@@ -94,12 +94,12 @@ export default function FilterBar() {
 
       {/* Status tabs */}
       <div className="flex items-center gap-2 w-full sm:w-auto">
-        <div className="flex bg-zinc-950/80 p-0.5 rounded border border-zinc-800/80 w-full sm:w-auto overflow-x-auto">
+        <div className="flex bg-zinc-950/80 p-0.5 rounded border border-zinc-800/80 flex-grow sm:flex-none w-full sm:w-auto overflow-x-auto">
           {statusOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => handleStatusChange(opt.value)}
-              className={`px-3 py-1 rounded text-xs font-semibold tracking-wider uppercase transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1 rounded text-xs font-semibold tracking-wider uppercase transition-all whitespace-nowrap cursor-pointer flex-1 sm:flex-none text-center ${
                 currentStatus === opt.value
                   ? "bg-zinc-800 text-white shadow-sm"
                   : "text-zinc-500 hover:text-zinc-300"
@@ -110,7 +110,7 @@ export default function FilterBar() {
           ))}
         </div>
         {isPending && (
-          <div className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-ping" />
+          <div className="h-1.5 w-1.5 rounded-full bg-zinc-500 animate-ping shrink-0" />
         )}
       </div>
     </div>

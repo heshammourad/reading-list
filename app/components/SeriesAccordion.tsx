@@ -24,6 +24,7 @@ interface SeriesAccordionProps {
   seriesName: string;
   allMatchingBooks: BookData[]; // All books in the series matching the current filter
   onEditSeries: () => void;
+  latestChartBookIds: number[];
 }
 
 export default function SeriesAccordion({
@@ -32,6 +33,7 @@ export default function SeriesAccordion({
   seriesName,
   allMatchingBooks,
   onEditSeries,
+  latestChartBookIds = [],
 }: SeriesAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -55,8 +57,14 @@ export default function SeriesAccordion({
       })
     : "N/A";
 
+  const isOnLatestChart = latestChartBookIds.includes(primaryBook.id);
+
   return (
-    <div className="border-b border-zinc-900/80 py-6 hover:bg-zinc-900/5 transition-all duration-200 px-2 rounded -mx-2">
+    <div className={`border-b py-6 transition-all duration-200 px-2 rounded -mx-2 ${
+      isOnLatestChart
+        ? "border-zinc-850 bg-amber-500/[0.02] hover:bg-amber-500/[0.04]"
+        : "border-zinc-900/80 hover:bg-zinc-900/5"
+    }`}>
       {/* Primary / Header Book Card */}
       <div className="flex gap-4 sm:gap-6 items-start">
         {/* Rank */}
@@ -75,37 +83,54 @@ export default function SeriesAccordion({
         {/* Book Details */}
         <div className="flex-grow min-w-0 flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="flex-grow min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-zinc-100 font-serif leading-snug uppercase">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+              <h2 className="text-sm sm:text-base md:text-lg font-bold tracking-tight text-zinc-100 font-serif leading-snug uppercase">
                 {primaryBook.name}
               </h2>
+              {isOnLatestChart && (
+                <span className="inline-flex items-center gap-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-bold uppercase tracking-wider shrink-0">
+                  <svg className="w-3 h-3 text-amber-400 fill-current" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  <span>On Chart</span>
+                </span>
+              )}
               {/* Series badge */}
-              <span className="inline-flex items-center bg-blue-950/30 text-blue-400 border border-blue-900/40 px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider">
+              <span className="inline-flex items-center bg-blue-950/30 text-blue-400 border border-blue-900/40 px-1.5 sm:px-2 py-0.5 rounded text-[8px] sm:text-[9px] font-bold uppercase tracking-wider font-sans">
                 {seriesName} #{primaryBook.series_order !== null ? Number(primaryBook.series_order) : "?"}
               </span>
             </div>
-            <p className="text-xs text-zinc-400 font-semibold uppercase tracking-wider mb-3">
+            <p className="text-[10px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider mb-2 sm:mb-3 font-sans">
               by {primaryBook.author}
             </p>
 
             {/* Metadata badges row */}
-            <div className="flex flex-wrap gap-2.5 items-center text-xs">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2.5 items-center text-[10px] sm:text-xs font-sans">
               {primaryBook.points !== undefined && (
-                <span className="inline-flex items-center gap-1.5 bg-amber-950/30 text-amber-400 border border-amber-900/40 px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider">
-                  <svg className="w-3 h-3 text-amber-400/90 fill-current" viewBox="0 0 20 20">
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-amber-950/30 text-amber-400 border border-amber-900/40 px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                  <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400/90 fill-current" viewBox="0 0 20 20">
                     <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
                   <span>{primaryBook.points} pts</span>
                 </span>
               )}
               {primaryBook.points !== undefined && <span className="text-zinc-800 select-none">•</span>}
-              <span className="text-zinc-500 font-medium">
-                Last seen: {formattedDate}
-              </span>
+              {isOnLatestChart ? (
+                <span className="inline-flex items-center gap-1 sm:gap-1.5 text-amber-400 font-semibold">
+                  Last seen: {formattedDate}
+                  <span className="bg-amber-500/15 text-amber-400 px-1 sm:px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-bold uppercase tracking-wider border border-amber-500/20 animate-pulse">
+                    Current
+                  </span>
+                </span>
+              ) : (
+                <span className="text-zinc-500 font-medium">
+                  Last seen: {formattedDate}
+                </span>
+              )}
               <span className="text-zinc-800 select-none">•</span>
               <button
                 onClick={onEditSeries}
-                className="text-zinc-500 hover:text-zinc-300 font-bold uppercase text-[10px] tracking-wider transition-colors cursor-pointer flex items-center gap-1"
+                className="text-zinc-500 hover:text-zinc-300 font-bold uppercase text-[9px] sm:text-[10px] tracking-wider transition-colors cursor-pointer flex items-center gap-1"
               >
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -137,7 +162,7 @@ export default function SeriesAccordion({
 
       {/* Accordion Toggle Trigger */}
       {otherBooks.length > 0 && (
-        <div className="pl-12 sm:pl-16 mt-3">
+        <div className="pl-6 sm:pl-16 mt-3">
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-zinc-900/60 border border-zinc-850 hover:bg-zinc-850 text-zinc-400 hover:text-zinc-200 text-xs font-semibold tracking-wide uppercase transition-all duration-200 cursor-pointer"
@@ -160,15 +185,18 @@ export default function SeriesAccordion({
 
       {/* Expanded Accordion List */}
       {isOpen && otherBooks.length > 0 && (
-        <div className="pl-12 sm:pl-16 mt-4 space-y-4 border-l-2 border-zinc-800/60 ml-4 sm:ml-5 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="pl-6 sm:pl-16 mt-4 space-y-3 border-l-2 border-zinc-800/60 ml-2 sm:ml-5 animate-in fade-in slide-in-from-top-2 duration-200">
           {sortedBooks.map((book) => {
             const isPrimary = book.id === primaryBook.id;
+            const bookIsOnLatestChart = latestChartBookIds.includes(book.id);
             return (
               <div
                 key={book.id}
                 className={`flex gap-4 p-3 rounded-lg border transition-all ${
                   isPrimary
                     ? "bg-zinc-900/20 border-zinc-800/40 opacity-70"
+                    : bookIsOnLatestChart
+                    ? "bg-amber-500/[0.01] border-amber-500/15 hover:bg-amber-500/[0.03]"
                     : "bg-zinc-950/40 border-zinc-900/50 hover:bg-zinc-950/70"
                 }`}
               >
@@ -184,28 +212,36 @@ export default function SeriesAccordion({
                 </div>
 
                 {/* Details */}
-                <div className="flex-grow min-w-0 flex items-start justify-between gap-3">
+                <div className="flex-grow min-w-0 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <h4 className="text-sm font-bold tracking-tight text-zinc-200 font-serif leading-snug uppercase truncate">
+                      <h4 className="text-xs sm:text-sm font-bold tracking-tight text-zinc-200 font-serif leading-snug uppercase truncate">
                         {book.name}
                       </h4>
-                      <span className="text-[10px] font-bold text-blue-400 bg-blue-950/20 border border-blue-900/30 px-1.5 py-0.2 rounded font-mono uppercase tracking-wider shrink-0">
+                      <span className="text-[9px] sm:text-[10px] font-bold text-blue-400 bg-blue-950/20 border border-blue-900/30 px-1.5 py-0.2 rounded font-mono uppercase tracking-wider shrink-0">
                         Book {book.series_order !== null ? Number(book.series_order) : "?"}
                       </span>
+                      {bookIsOnLatestChart && (
+                        <span className="inline-flex items-center gap-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded text-[8px] font-bold uppercase tracking-wider shrink-0">
+                          <svg className="w-2.5 h-2.5 fill-current text-amber-400" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                          <span>On Chart</span>
+                        </span>
+                      )}
                       {isPrimary && (
                         <span className="text-[9px] font-bold text-amber-500 bg-amber-950/20 border border-amber-900/30 px-1.5 py-0.2 rounded uppercase tracking-wider shrink-0">
                           Current Charted
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">
+                    <p className="text-[10px] sm:text-[11px] text-zinc-500 font-semibold uppercase tracking-wider mt-0.5">
                       by {book.author}
                     </p>
                   </div>
 
                   {/* Interactive StatusBadge */}
-                  <div className="shrink-0 pt-0.5">
+                  <div className="shrink-0 pt-0.5 self-start sm:self-auto">
                     <StatusBadge bookId={book.id} initialStatus={book.status || "Unread"} />
                   </div>
                 </div>

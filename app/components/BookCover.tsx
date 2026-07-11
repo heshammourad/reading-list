@@ -79,7 +79,7 @@ export default function BookCover({ title, author, initialCover, bookId, size = 
     });
   };
 
-  const containerClasses = size === "small" ? "h-24 w-16" : "h-36 w-24";
+  const containerClasses = size === "small" ? "h-20 w-14 sm:h-24 sm:w-16" : "h-28 w-20 sm:h-36 sm:w-24";
 
   if (loading) {
     return (
@@ -111,12 +111,12 @@ export default function BookCover({ title, author, initialCover, bookId, size = 
       {!coverUrl ? (
         <div className={`relative group flex shrink-0 flex-col items-center justify-between rounded bg-gradient-to-br from-zinc-800 to-zinc-950 p-2 text-center border border-zinc-700/50 shadow-md overflow-hidden ${containerClasses}`}>
           <div className="w-full flex-grow flex items-center justify-center">
-            <p className={`${size === "small" ? "text-[10px] leading-none line-clamp-3" : "text-xs leading-tight line-clamp-4"} font-bold text-zinc-300 uppercase font-serif`}>
+            <p className={`${size === "small" ? "text-[8px] sm:text-[10px] leading-none line-clamp-3" : "text-[9px] sm:text-xs leading-tight line-clamp-4"} font-bold text-zinc-300 uppercase font-serif`}>
               {title}
             </p>
           </div>
           {size !== "small" && (
-            <p className="text-[10px] text-zinc-500 truncate w-full border-t border-zinc-800 pt-1">
+            <p className="text-[8px] sm:text-[10px] text-zinc-500 truncate w-full border-t border-zinc-850 pt-1">
               {author}
             </p>
           )}
