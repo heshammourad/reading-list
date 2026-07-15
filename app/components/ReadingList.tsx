@@ -6,6 +6,16 @@ import StatusBadge from "./StatusBadge";
 import SeriesAccordion from "./SeriesAccordion";
 import SeriesManager from "./SeriesManager";
 
+const getNYTimesUrl = (dateStr?: string | null) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `https://www.nytimes.com/books/best-sellers/${yyyy}/${mm}/${dd}/combined-print-and-e-book-fiction/`;
+};
+
 interface BookData {
   id: number;
   name: string;
@@ -165,14 +175,36 @@ export default function ReadingList({
                     <span className="text-zinc-800 select-none">•</span>
                     {isOnLatestChart ? (
                       <span className="inline-flex items-center gap-1 sm:gap-1.5 text-amber-400 font-semibold">
-                        Last seen: {formattedDate}
+                        {book.last ? (
+                          <a
+                            href={getNYTimesUrl(book.last)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline hover:text-amber-300 transition-colors"
+                          >
+                            Last seen: {formattedDate}
+                          </a>
+                        ) : (
+                          `Last seen: ${formattedDate}`
+                        )}
                         <span className="bg-amber-500/15 text-amber-400 px-1 sm:px-1.5 py-0.2 rounded text-[8px] sm:text-[9px] font-bold uppercase tracking-wider border border-amber-500/20 animate-pulse">
                           Current
                         </span>
                       </span>
                     ) : (
                       <span className="text-zinc-500 font-medium font-sans">
-                        Last seen: {formattedDate}
+                        {book.last ? (
+                          <a
+                            href={getNYTimesUrl(book.last)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hover:underline hover:text-zinc-300 transition-colors"
+                          >
+                            Last seen: {formattedDate}
+                          </a>
+                        ) : (
+                          `Last seen: ${formattedDate}`
+                        )}
                       </span>
                     )}
                     <span className="text-zinc-800 select-none">•</span>
