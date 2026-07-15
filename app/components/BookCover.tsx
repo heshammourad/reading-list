@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { updateBookCover } from "@/app/actions";
+import { prefixUrl } from "@/config";
 
 interface BookCoverProps {
   title: string;
@@ -31,7 +32,7 @@ export default function BookCover({ title, author, initialCover, bookId, size = 
     const fetchCover = async () => {
       try {
         const res = await fetch(
-          `/api/cover?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`
+          prefixUrl(`/api/cover?title=${encodeURIComponent(title)}&author=${encodeURIComponent(author)}`)
         );
         if (res.ok) {
           const data = await res.json();
@@ -142,7 +143,7 @@ export default function BookCover({ title, author, initialCover, bookId, size = 
               Edit Cover Image
             </h3>
             <p className="text-[11px] text-zinc-400 mb-4 leading-normal">
-              Enter a custom image URL for <span className="text-zinc-200 font-semibold">"{title}"</span>. Leave blank to reset to default.
+              Enter a custom image URL for <span className="text-zinc-200 font-semibold">&quot;{title}&quot;</span>. Leave blank to reset to default.
             </p>
             
             <div className="space-y-3">
