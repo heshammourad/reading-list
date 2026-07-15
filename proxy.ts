@@ -5,8 +5,10 @@ export function proxy(request: NextRequest) {
   const host = request.headers.get("host");
   const isProduction = process.env.NODE_ENV === "production";
 
+  const fromPortal = request.headers.get("x-from-portal") === "true";
+
   // In production, enforce that all requests come through your main domain
-  if (isProduction && host && host !== "heshammourad.com") {
+  if (isProduction && !fromPortal && host && host !== "heshammourad.com") {
     // If it's a Vercel preview deployment or system request, we might want to bypass it
     const isVercelPreview = host.endsWith(".vercel.app") && host !== "heshammourad-reading-list.vercel.app";
     
