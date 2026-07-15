@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { SUBPATH_PREFIX } from "./config";
 
 const allowedOrigins = [
   "localhost:3000",
@@ -17,12 +18,22 @@ if (process.env.CODESPACE_NAME && process.env.GITHUB_CODESPACES_PORT_FORWARDING_
 }
 
 const nextConfig: NextConfig = {
-  basePath: "/reading-list",
-  skipTrailingSlashRedirect: true,
+  basePath: SUBPATH_PREFIX || undefined,
   experimental: {
     serverActions: {
       allowedOrigins,
     },
+  },
+  async redirects() {
+    if (!SUBPATH_PREFIX) return [];
+    return [
+      {
+        source: "/",
+        destination: SUBPATH_PREFIX,
+        permanent: false,
+        basePath: false,
+      },
+    ];
   },
 };
 
