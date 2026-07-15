@@ -18,7 +18,7 @@ if (process.env.CODESPACE_NAME && process.env.GITHUB_CODESPACES_PORT_FORWARDING_
 
 const nextConfig: NextConfig = {
   basePath: "/reading-list",
-  trailingSlash: true,
+  skipTrailingSlashRedirect: true,
   experimental: {
     serverActions: {
       allowedOrigins,
