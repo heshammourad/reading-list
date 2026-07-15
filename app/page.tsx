@@ -1,65 +1,184 @@
-import Image from "next/image";
+import { prisma } from "@/lib/db";
+import FilterBar from "./components/FilterBar";
+import Pagination from "./components/Pagination";
+import ReadingList from "./components/ReadingList";
 
-export default function Home() {
+interface PageProps {
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    status?: string;
+  }>;
+}
+
+export default async function Home({ searchParams }: PageProps) {
+  const resolvedParams = await searchParams;
+  const page = Math.max(1, parseInt(resolvedParams.page || "1", 10));
+  const search = resolvedParams.search || "";
+  const status = resolvedParams.status || "Unread";
+
+  const limit = 15;
+  const offset = (page - 1) * limit;
+
+  const searchVal = search ? `%${search.trim()}%` : null;
+  const statusVal = status && status !== "all" ? status : null;
+
+  // Build the dynamic SQL query with filters
+  let query = `
+    SELECT
+      b.id,
+      v.name,
+      v.author,
+      v.status,
+      b.cover_image_url,
+      b.series_id,
+      b.series_order,
+      v.points,
+      v.weeks,
+      v.high,
+      v.last
+    FROM book_rank_summary v
+    LEFT JOIN books b ON b.name = v.name AND b.author = v.author
+    WHERE 1=1
+  `;
+
+  const params: any[] = [];
+
+  if (searchVal) {
+    params.push(searchVal);
+    query += ` AND (v.name ILIKE $${params.length} OR v.author ILIKE $${params.length})`;
+  }
+
+  if (statusVal) {
+    if (statusVal === "Unread") {
+      query += ` AND (v.status = 'Unread' OR v.status = 'On Hold' OR v.status = 'Available' OR v.status = 'Unavailable' OR v.status IS NULL)`;
+    } else {
+      params.push(statusVal);
+      query += ` AND v.status = $${params.length}`;
+    }
+  }
+
+  // View is already ordered, but let's enforce view sort keys explicitly to prevent Postgres random sorting
+  query += ` ORDER BY v.points DESC, v.weeks DESC, v.high ASC, v.last ASC, v.name ASC`;
+
+  // Add pagination limits
+  params.push(limit);
+  query += ` LIMIT $${params.length}`;
+
+  params.push(offset);
+  query += ` OFFSET $${params.length}`;
+
+  // Count query for pagination totals
+  let countQuery = `
+    SELECT COUNT(*)::int as count
+    FROM book_rank_summary v
+    WHERE 1=1
+  `;
+
+  const countParams: any[] = [];
+
+  if (searchVal) {
+    countParams.push(searchVal);
+    countQuery += ` AND (v.name ILIKE $${countParams.length} OR v.author ILIKE $${countParams.length})`;
+  }
+
+  if (statusVal) {
+    if (statusVal === "Unread") {
+      countQuery += ` AND (v.status = 'Unread' OR v.status = 'On Hold' OR v.status = 'Available' OR v.status = 'Unavailable' OR v.status IS NULL)`;
+    } else {
+      countParams.push(statusVal);
+      countQuery += ` AND v.status = $${countParams.length}`;
+    }
+  }
+
+  let books: any[] = [];
+  let totalEntries = 0;
+  let latestChartBookIds: number[] = [];
+
+  try {
+    const [booksRes, countRes, latestChartsRes] = await Promise.all([
+      prisma.$queryRawUnsafe<any[]>(query, ...params),
+      prisma.$queryRawUnsafe<{ count: number }[]>(countQuery, ...countParams),
+      prisma.$queryRawUnsafe<{ book_id: number }[]>(`
+        SELECT DISTINCT book_id 
+        FROM charts 
+        WHERE date = (SELECT MAX(date) FROM charts) 
+          AND book_id IS NOT NULL
+      `),
+    ]);
+    books = booksRes.map(b => ({
+      ...b,
+      series_order: b.series_order ? Number(b.series_order) : null
+    }));
+    totalEntries = countRes[0]?.count ?? 0;
+    latestChartBookIds = latestChartsRes.map(c => c.book_id);
+  } catch (err: any) {
+    console.error("Database query failed:", err.message);
+  }
+
+  // Fetch all series info if any book belongs to a series
+  const seriesIds = books.map((b) => b.series_id).filter(Boolean) as number[];
+  
+  let allSeriesBooks: any[] = [];
+  let seriesMap: Record<number, string> = {};
+
+  if (seriesIds.length > 0) {
+    const [seriesList, dbBooks] = await Promise.all([
+      prisma.series.findMany({
+        where: { id: { in: seriesIds } }
+      }),
+      prisma.books.findMany({
+        where: { series_id: { in: seriesIds } }
+      })
+    ]);
+    
+    allSeriesBooks = dbBooks.map(b => ({
+      ...b,
+      series_order: b.series_order ? Number(b.series_order) : null // normalize Decimal to number
+    }));
+
+    seriesList.forEach((s) => {
+      seriesMap[s.id] = s.name;
+    });
+  }
+
+  const totalPages = Math.ceil(totalEntries / limit);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-zinc-800 selection:text-white font-sans antialiased">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+        
+        {/* Header */}
+        <header className="text-center mb-12 border-b border-zinc-850 pb-8">
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tight font-serif text-zinc-50 uppercase mb-3">
+            My Reading List
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-xs sm:text-sm text-zinc-500 uppercase tracking-widest font-semibold font-sans">
+            NYTimes Best Sellers · Score-Weighted Rank
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        </header>
+
+        {/* Filter & Search Bar */}
+        <FilterBar />
+
+        {/* Book List */}
+        <ReadingList
+          books={books}
+          allSeriesBooks={allSeriesBooks}
+          seriesMap={seriesMap}
+          offset={offset}
+          statusFilter={status}
+          latestChartBookIds={latestChartBookIds}
+        />
+
+        {/* Pagination */}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalEntries={totalEntries}
+          pageSize={limit}
+        />
+      </div>
     </div>
   );
 }

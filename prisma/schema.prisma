@@ -15,8 +15,6 @@ model books {
   series_id       Int?
   series_order    Decimal? @db.Decimal
   cover_image_url String?
-  series          series?  @relation(fields: [series_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_series")
-  charts          charts[]
 
   @@unique([name, author])
 }
@@ -27,13 +25,11 @@ model charts {
   rank          Int
   weeks_on_list Int
   date          DateTime @db.Date
-  books         books?   @relation(fields: [book_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([book_id, date])
 }
 
 model series {
-  id    Int     @id @default(autoincrement())
-  name  String  @unique
-  books books[]
+  id   Int    @id @default(autoincrement())
+  name String @unique
 }
