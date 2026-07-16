@@ -63,7 +63,59 @@ export async function GET(req: NextRequest) {
 
           if (nytRes.ok) {
             const data = await nytRes.json();
-            // Match the book by title (ignoring case and punctuation)
+
+            // Store/cache all cover images found in the NYTimes best sellers chart list
+            if (data.results?.books && Array.isArray(data.results.books)) {
+              // Fetch all books from the DB that currently do not have a cover image URL
+              // This allows us to do robust clean title & author matching
+              // for all bestsellers returned in the list.
+              const booksWithoutCovers = await prisma.books.findMany({
+                where: {
+                  OR: [
+                    { cover_image_url: null },
+                    { cover_image_url: "" }
+                  ]
+                },
+                select: {
+                  id: true,
+                  name: true,
+                  author: true
+                }
+              });
+
+              for (const b of data.results.books) {
+                if (b.title && b.author && b.book_image) {
+                  const bCoverUrl = b.book_image.replace(/^http:/, "https:");
+                  const bCacheKey = `${b.title.toLowerCase()}|${b.author.toLowerCase()}`;
+                  
+                  // Cache in memory so subsequent API calls don't need a DB/network fetch
+                  localCache.set(bCacheKey, bCoverUrl);
+
+                  // Try to find matching books in the DB to save permanently
+                  const cleanBTitle = b.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const cleanBAuthor = b.author.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+                  const matchingBooks = booksWithoutCovers.filter((dbBook: any) => {
+                    const dbCleanTitle = dbBook.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    const dbCleanAuthor = dbBook.author.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    return dbCleanTitle === cleanBTitle && dbCleanAuthor === cleanBAuthor;
+                  });
+
+                  for (const dbBook of matchingBooks) {
+                    try {
+                      await prisma.books.update({
+                        where: { id: dbBook.id },
+                        data: { cover_image_url: bCoverUrl },
+                      });
+                    } catch (dbErr: any) {
+                      console.error(`Failed to update cover for book ID ${dbBook.id} (${dbBook.name}):`, dbErr.message);
+                    }
+                  }
+                }
+              }
+            }
+
+            // Match the requested book by title (ignoring case and punctuation)
             const cleanTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
             const nytBook = data.results?.books?.find((b: any) => {
               const bClean = b.title.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -74,10 +126,16 @@ export async function GET(req: NextRequest) {
             if (coverUrl) {
               const secureCoverUrl = coverUrl.replace(/^http:/, "https:");
 
-              await prisma.books.update({
-                where: { id: book.id },
-                data: { cover_image_url: secureCoverUrl },
-              });
+              // In case it wasn't updated in the loop above (e.g. if database row had cover,
+              // or some other mismatch, ensure we update the queried book's cover image)
+              try {
+                await prisma.books.update({
+                  where: { id: book.id },
+                  data: { cover_image_url: secureCoverUrl },
+                });
+              } catch (dbErr: any) {
+                console.error(`Failed to update queried book cover for ID ${book.id}:`, dbErr.message);
+              }
 
               localCache.set(cacheKey, secureCoverUrl);
               return NextResponse.json({ cover_image_url: secureCoverUrl });
