@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const host =
     request.headers.get("x-forwarded-host") ||
     request.headers.get("host") ||
@@ -32,7 +32,7 @@ export function middleware(request: NextRequest) {
           status: 403,
           headers: {
             "content-type": "application/json",
-            "x-reading-list-middleware": "blocked",
+            "x-reading-list-proxy": "blocked",
           },
         }
       );
@@ -41,13 +41,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect("https://heshammourad.com/reading-list", {
       status: 307,
       headers: {
-        "x-reading-list-middleware": "redirected",
+        "x-reading-list-proxy": "redirected",
       },
     });
   }
 
   const response = NextResponse.next();
-  response.headers.set("x-reading-list-middleware", "allowed");
+  response.headers.set("x-reading-list-proxy", "allowed");
   return response;
 }
 
