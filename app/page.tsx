@@ -3,6 +3,8 @@ import FilterBar from "./components/FilterBar";
 import Pagination from "./components/Pagination";
 import ReadingList from "./components/ReadingList";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   searchParams: Promise<{
     page?: string;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(request: NextRequest) {
+export function handleProxy(request: NextRequest) {
   const host =
     request.headers.get("x-forwarded-host") ||
     request.headers.get("host") ||
@@ -49,6 +49,18 @@ export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   response.headers.set("x-reading-list-middleware", "allowed");
   return response;
+}
+
+export function proxy(request: NextRequest) {
+  return handleProxy(request);
+}
+
+export function middleware(request: NextRequest) {
+  return handleProxy(request);
+}
+
+export default function defaultExport(request: NextRequest) {
+  return handleProxy(request);
 }
 
 export const config = {
