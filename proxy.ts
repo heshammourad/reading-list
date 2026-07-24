@@ -7,7 +7,6 @@ export function proxy(request: NextRequest) {
     request.headers.get("host") ||
     request.nextUrl.hostname;
 
-  // Shared secret check between heshammourad-portal and reading-list
   const portalSecret = process.env.PORTAL_SECRET;
   const requestSecret =
     request.headers.get("x-portal-secret") ||
@@ -19,7 +18,7 @@ export function proxy(request: NextRequest) {
 
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  // In production, require all requests to come through portal with valid authorization header
+  // In non-localhost environments, require request to come via portal authorization
   if (!isLocalhost && !isValidPortalRequest) {
     if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
@@ -31,27 +30,17 @@ export function proxy(request: NextRequest) {
           status: 403,
           headers: {
             "content-type": "application/json",
-            "x-reading-list-proxy": "blocked",
           },
         }
       );
     }
 
-    return NextResponse.redirect("https://heshammourad.com/reading-list", {
-      status: 307,
-      headers: {
-        "x-reading-list-proxy": "redirected",
-      },
-    });
+    return NextResponse.redirect("https://heshammourad.com/reading-list", 307);
   }
 
-  const response = NextResponse.next();
-  response.headers.set("x-reading-list-proxy", "allowed");
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
