@@ -7,7 +7,7 @@ export function proxy(request: NextRequest) {
     request.headers.get("host") ||
     request.nextUrl.hostname;
 
-  // Check if request comes from portal via secret or x-from-portal header
+  // Shared secret check between heshammourad-portal and reading-list
   const portalSecret = process.env.PORTAL_SECRET;
   const requestSecret =
     request.headers.get("x-portal-secret") ||
@@ -17,11 +17,10 @@ export function proxy(request: NextRequest) {
     ? requestSecret === portalSecret
     : request.headers.get("x-from-portal") === "true";
 
-  const isMainDomain = host.includes("heshammourad.com");
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  // If not local dev, and not valid portal request, and not main domain -> Block direct Vercel access
-  if (!isLocalhost && !isValidPortalRequest && !isMainDomain) {
+  // In production, require all requests to come through portal with valid authorization header
+  if (!isLocalhost && !isValidPortalRequest) {
     if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
         JSON.stringify({
