@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
-  const host = request.headers.get("host") || "";
-  const isProduction = process.env.NODE_ENV === "production";
+  const host =
+    request.headers.get("x-forwarded-host") ||
+    request.headers.get("host") ||
+    request.nextUrl.hostname;
 
-  // Shared secret check between portal (heshammourad-portal) and reading-list
+  // Check if request comes from portal via secret or x-from-portal header
   const portalSecret = process.env.PORTAL_SECRET;
   const requestSecret =
     request.headers.get("x-portal-secret") ||
@@ -15,10 +17,11 @@ export function middleware(request: NextRequest) {
     ? requestSecret === portalSecret
     : request.headers.get("x-from-portal") === "true";
 
-  const isMainDomain = host === "heshammourad.com";
+  const isMainDomain = host.includes("heshammourad.com");
+  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  // In production, prohibit direct access to all *.vercel.app domains unless authenticated via portal secret
-  if (isProduction && !isValidPortalRequest && !isMainDomain) {
+  // If not local dev, and not valid portal request, and not main domain -> Block direct Vercel access
+  if (!isLocalhost && !isValidPortalRequest && !isMainDomain) {
     if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
         JSON.stringify({
@@ -27,25 +30,29 @@ export function middleware(request: NextRequest) {
         }),
         {
           status: 403,
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "x-reading-list-middleware": "blocked",
+          },
         }
       );
     }
 
-    return NextResponse.redirect("https://heshammourad.com/reading-list", 307);
+    return NextResponse.redirect("https://heshammourad.com/reading-list", {
+      status: 307,
+      headers: {
+        "x-reading-list-middleware": "redirected",
+      },
+    });
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set("x-reading-list-middleware", "allowed");
+  return response;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
