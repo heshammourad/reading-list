@@ -2,20 +2,28 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function proxy(request: NextRequest) {
-  const host = request.headers.get("host");
+  const host = request.headers.get("host") || "";
   const isProduction = process.env.NODE_ENV === "production";
 
-  const fromPortal = request.headers.get("x-from-portal") === "true";
+  // Shared secret check between portal (heshammourad-portal) and reading-list
+  const portalSecret = process.env.PORTAL_SECRET;
+  const requestSecret =
+    request.headers.get("x-portal-secret") ||
+    request.headers.get("x-from-portal");
 
-  // In production, enforce that all requests come through your main domain
-  if (isProduction && !fromPortal && host && host !== "heshammourad.com") {
-    // If it's a Vercel preview deployment or system request, we might want to bypass it
-    const isVercelPreview = host.endsWith(".vercel.app") && host !== "heshammourad-reading-list.vercel.app";
-    
-    if (!isVercelPreview) {
+  const isValidPortalRequest = portalSecret
+    ? requestSecret === portalSecret
+    : request.headers.get("x-from-portal") === "true";
+
+  const isMainDomain = host === "heshammourad.com";
+
+  // In production, prohibit direct access to all *.vercel.app domains unless authenticated via portal secret
+  if (isProduction && !isValidPortalRequest && !isMainDomain) {
+    if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
         JSON.stringify({
-          error: "Direct access is prohibited. Please visit heshammourad.com instead.",
+          error:
+            "Direct access is prohibited. Please access via https://heshammourad.com/reading-list",
         }),
         {
           status: 403,
@@ -23,11 +31,21 @@ export function proxy(request: NextRequest) {
         }
       );
     }
+
+    return NextResponse.redirect("https://heshammourad.com/reading-list", 307);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: "/:path*",
+  matcher: [
+    /*
+     * Match all request paths except for:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 };
