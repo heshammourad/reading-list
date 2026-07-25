@@ -18,22 +18,22 @@ export function proxy(request: NextRequest) {
   );
 
   if (!isLocalhost && !isValidPortalRequest) {
-    if (request.nextUrl.pathname.startsWith("/api")) {
-      return new NextResponse(
-        JSON.stringify({
-          error:
-            "Direct access is prohibited. Please access via https://heshammourad.com/reading-list",
-        }),
-        {
-          status: 403,
-          headers: {
-            "content-type": "application/json",
-          },
-        }
-      );
-    }
-
-    return NextResponse.redirect("https://heshammourad.com/reading-list", 307);
+    return new NextResponse(
+      JSON.stringify({
+        error:
+          "Direct access is prohibited. Please access via https://heshammourad.com/reading-list",
+        debug: {
+          pathname: request.nextUrl.pathname,
+          host,
+        },
+      }),
+      {
+        status: 403,
+        headers: {
+          "content-type": "application/json",
+        },
+      }
+    );
   }
 
   return NextResponse.next();
