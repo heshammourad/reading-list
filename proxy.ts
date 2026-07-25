@@ -7,18 +7,16 @@ export function proxy(request: NextRequest) {
     request.headers.get("host") ||
     request.nextUrl.hostname;
 
-  const portalSecret = process.env.PORTAL_SECRET;
-  const requestSecret =
-    request.headers.get("x-portal-secret") ||
-    request.headers.get("x-from-portal");
-
-  const isValidPortalRequest = portalSecret
-    ? requestSecret === portalSecret
-    : request.headers.get("x-from-portal") === "true";
-
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  // In non-localhost environments, require request to come via portal authorization
+  const portalSecret = process.env.PORTAL_SECRET;
+  const requestSecret = request.headers.get("x-portal-secret");
+
+  // In non-localhost environments, require request to come via portal authorization with valid secret
+  const isValidPortalRequest = Boolean(
+    portalSecret && requestSecret && requestSecret === portalSecret
+  );
+
   if (!isLocalhost && !isValidPortalRequest) {
     if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
@@ -44,3 +42,4 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
+
