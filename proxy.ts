@@ -33,7 +33,15 @@ export function proxy(request: NextRequest) {
       );
     }
 
-    return NextResponse.redirect("https://heshammourad.com/reading-list", 307);
+    return new NextResponse(
+      "Direct access is prohibited. Please access via https://heshammourad.com/reading-list",
+      {
+        status: 403,
+        headers: {
+          "content-type": "text/plain",
+        },
+      }
+    );
   }
 
   return NextResponse.next();
