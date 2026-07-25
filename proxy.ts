@@ -18,28 +18,29 @@ export function proxy(request: NextRequest) {
   );
 
   if (!isLocalhost && !isValidPortalRequest) {
-    return new NextResponse(
-      JSON.stringify({
-        error:
-          "Direct access is prohibited. Please access via https://heshammourad.com/reading-list",
-        debug: {
-          pathname: request.nextUrl.pathname,
-          host,
-        },
-      }),
-      {
-        status: 403,
-        headers: {
-          "content-type": "application/json",
-        },
-      }
-    );
+    if (request.nextUrl.pathname.startsWith("/api")) {
+      return new NextResponse(
+        JSON.stringify({
+          error:
+            "Direct access is prohibited. Please access via https://heshammourad.com/reading-list",
+        }),
+        {
+          status: 403,
+          headers: {
+            "content-type": "application/json",
+          },
+        }
+      );
+    }
+
+    return NextResponse.redirect("https://heshammourad.com/reading-list", 307);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // "/" is explicitly included because Next.js skips the proxy for the basePath
+  // root when using only the negative-lookahead pattern
+  matcher: ["/", "/((?!_next/static|_next/image|favicon.ico).*)"],
 };
-
