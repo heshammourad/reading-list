@@ -9,15 +9,7 @@ export function proxy(request: NextRequest) {
 
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  const portalSecret = process.env.PORTAL_SECRET;
-  const requestSecret = request.headers.get("x-portal-secret");
-
-  // In non-localhost environments, require request to come via portal authorization with valid secret
-  const isValidPortalRequest = Boolean(
-    portalSecret && requestSecret && requestSecret === portalSecret
-  );
-
-  if (!isLocalhost && !isValidPortalRequest) {
+  if (!isLocalhost) {
     if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
         JSON.stringify({
