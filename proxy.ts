@@ -12,22 +12,52 @@ function secretsMatch(a: string, b: string) {
 }
 
 export function proxy(request: NextRequest) {
-  const host =
+  // Vercel overwrites x-forwarded-host with the true host, so it cannot be
+  // forged; a Host: override is rejected at the edge before reaching us.
+  const hostname = (
     request.headers.get("x-forwarded-host") ||
     request.headers.get("host") ||
-    request.nextUrl.hostname;
+    request.nextUrl.hostname
+  )
+    .split(":")[0]
+    .toLowerCase();
 
-  const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
+  const vercelEnv = process.env.VERCEL_ENV;
+
+  // Preview deployments carry an unpredictable *.vercel.app host, so no
+  // allowlist can name them. They are already gated by Vercel Authentication
+  // (Standard Protection), which 302s to vercel.com/sso-api before this runs —
+  // measured 2026-08-12, alongside the production alias, which is NOT covered
+  // by it and so still depends on the checks below. Without this branch the
+  // host allowlist makes previews untestable rather than making them safe.
+  const isPreviewDeployment = vercelEnv === "preview";
+
+  // Suffix match, not substring: includes("heshammourad.com") would also admit
+  // heshammourad.com.attacker.test and notheshammourad.com.
+  const isPortalHost =
+    hostname === "heshammourad.com" || hostname.endsWith(".heshammourad.com");
+
+  // Local and Codespaces hosts are development conveniences. They were
+  // previously allowed on production too, which meant a Codespace port set to
+  // public exposed the whole app at a *.github.dev host with no auth at all.
+  const isDevelopmentHost =
+    vercelEnv !== "production" &&
+    (hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".github.dev") ||
+      hostname.endsWith(".github.preview.dev"));
+
+  const isAllowedHost = isPreviewDeployment || isPortalHost || isDevelopmentHost;
 
   const portalSecret = process.env.READING_LIST_SECRET;
   const requestSecret = request.headers.get("x-portal-secret");
 
-  // In non-localhost environments, require request to come via portal authorization with valid secret
+  // In non-allowed host environments, require request to come via portal authorization with valid secret
   const isValidPortalRequest = Boolean(
     portalSecret && requestSecret && secretsMatch(requestSecret, portalSecret)
   );
 
-  if (!isLocalhost && !isValidPortalRequest) {
+  if (!isAllowedHost && !isValidPortalRequest) {
     if (request.nextUrl.pathname.startsWith("/api")) {
       return new NextResponse(
         JSON.stringify({
