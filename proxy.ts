@@ -1,5 +1,15 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+
+// Constant-time so a mismatched secret can't be distinguished from a matching
+// one by response latency. Length is compared first since timingSafeEqual
+// throws (rather than returning false) on a length mismatch.
+function secretsMatch(a: string, b: string) {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  return bufA.length === bufB.length && timingSafeEqual(bufA, bufB);
+}
 
 export function proxy(request: NextRequest) {
   const host =
@@ -9,12 +19,12 @@ export function proxy(request: NextRequest) {
 
   const isLocalhost = host.includes("localhost") || host.includes("127.0.0.1");
 
-  const portalSecret = process.env.PORTAL_SECRET;
+  const portalSecret = process.env.READING_LIST_SECRET;
   const requestSecret = request.headers.get("x-portal-secret");
 
   // In non-localhost environments, require request to come via portal authorization with valid secret
   const isValidPortalRequest = Boolean(
-    portalSecret && requestSecret && requestSecret === portalSecret
+    portalSecret && requestSecret && secretsMatch(requestSecret, portalSecret)
   );
 
   if (!isLocalhost && !isValidPortalRequest) {
