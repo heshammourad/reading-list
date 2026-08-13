@@ -19,6 +19,17 @@ if (process.env.CODESPACE_NAME && process.env.GITHUB_CODESPACES_PORT_FORWARDING_
 
 const nextConfig: NextConfig = {
   basePath: SUBPATH_PREFIX || undefined,
+  // Points _next/static (JS/CSS/font) URLs at this deployment's own origin instead of the
+  // portal's domain. Without this, every asset request goes through the portal's proxy.ts,
+  // which runs NextAuth and rewrites the request, instead of hitting Vercel's static/CDN
+  // layer directly -- costing a function invocation per asset and bypassing edge caching.
+  // Explicit here because Next.js only defaults assetPrefix to basePath when assetPrefix is
+  // left unset (see next.config.js docs); an absolute assetPrefix must include basePath
+  // itself, since files are still served under it regardless of assetPrefix.
+  assetPrefix:
+    process.env.VERCEL_ENV === "production"
+      ? `https://reading-list-six-psi.vercel.app${SUBPATH_PREFIX}`
+      : undefined,
   experimental: {
     serverActions: {
       allowedOrigins,
