@@ -4,6 +4,8 @@ Fetches the current NYT Combined Print & E-Book Fiction list from the NYT Books 
 
 `main.py` is deployed as the Cloud Run function `nytimes-books-charts-ingester` (project `heshammourad`, region `us-west1`, entry point `update_books_trigger`). The Cloud Scheduler job `nytimes-charts-updater` calls it daily at 17:00 America/Los_Angeles. It only fetches the current list and does nothing if that date is already in the database, so it doesn't backfill weeks it missed. Running it again is safe.
 
+If a run fails, it emails the traceback and returns a 500. The scheduler job retries failed runs up to 3 times, starting 5 minutes apart, so one bad day can send up to 4 failure emails (same subject, so they thread together).
+
 The unread ranking comes from the `book_rank_summary` view in the database, not from this code.
 
 ## Configuration

@@ -268,6 +268,12 @@ def update_books_trigger(request):
     except Exception as e:
         error_msg = traceback.format_exc()
         print(f"CRITICAL FAILURE:\n{error_msg}")
+        # Cloud Scheduler retries failed runs, so this can arrive more than once;
+        # the dated subject keeps a day's failures in one thread
+        send_email(
+            f"⚠️ NYT Charts Ingester Failed: {date.today().strftime('%B %d, %Y')}",
+            f"The NYT charts ingester failed:\n\n{error_msg}",
+        )
         return f"Error: {e}", 500
 
 if __name__ == "__main__":
