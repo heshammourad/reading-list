@@ -1,7 +1,93 @@
 "use client";
 
-import { useState, useEffect, useTransition, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useTransition, useRef, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { getSeriesList, createSeries, saveBookSeries, addSeriesBooks, searchExistingBooks, getSeriesBooks } from "@/app/actions";
+
+interface BookMatch {
+  id: number;
+  name: string;
+  author: string;
+}
+
+// Rendered in a portal with fixed positioning so the list isn't clipped by the
+// modal's scrolling containers. Flips above the input when there's no room below.
+function TitleSuggestions({
+  inputRefs,
+  index,
+  results,
+  onSelect,
+}: {
+  inputRefs: RefObject<(HTMLInputElement | null)[]>;
+  index: number;
+  results: BookMatch[];
+  onSelect: (match: BookMatch) => void;
+}) {
+  const [pos, setPos] = useState<{
+    left: number;
+    width: number;
+    maxHeight: number;
+    top?: number;
+    bottom?: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    const anchor = inputRefs.current[index];
+    if (!anchor) return;
+
+    const update = () => {
+      const rect = anchor.getBoundingClientRect();
+      const gap = 4;
+      const margin = 8;
+      const spaceBelow = window.innerHeight - rect.bottom - gap - margin;
+      const spaceAbove = rect.top - gap - margin;
+      const placeAbove = spaceBelow < 200 && spaceAbove > spaceBelow;
+      const width = Math.min(Math.max(rect.width, 320), window.innerWidth - margin * 2);
+      const left = Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin));
+
+      setPos({
+        left,
+        width,
+        maxHeight: Math.min(320, placeAbove ? spaceAbove : spaceBelow),
+        ...(placeAbove
+          ? { bottom: window.innerHeight - rect.top + gap }
+          : { top: rect.bottom + gap }),
+      });
+    };
+
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [inputRefs, index]);
+
+  if (!pos) return null;
+
+  return createPortal(
+    <div
+      style={pos}
+      className="fixed bg-zinc-950 border border-zinc-700 rounded shadow-2xl overflow-y-auto z-[60]"
+    >
+      {results.map((match) => (
+        <button
+          key={match.id}
+          type="button"
+          // Keep focus on the input so its blur handler doesn't race the click
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onSelect(match)}
+          className="w-full text-left px-3 py-2 hover:bg-zinc-800 text-xs text-zinc-300 hover:text-white transition-colors border-b border-zinc-900/60 last:border-0 flex flex-col cursor-pointer"
+        >
+          <span className="font-bold truncate">{match.name}</span>
+          <span className="text-[10px] text-zinc-500 truncate">by {match.author}</span>
+        </button>
+      ))}
+    </div>,
+    document.body
+  );
+}
 
 interface SeriesManagerProps {
   isOpen: boolean;
@@ -45,6 +131,7 @@ export default function SeriesManager({
   const [newBooks, setNewBooks] = useState<SeriesBookInput[]>([]);
 
   const newSeriesInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (selectedSeriesId === "new") {
@@ -78,15 +165,26 @@ export default function SeriesManager({
     }
   }, [selectedSeriesId, isOpen, bookId]);
 
+  // Focus the title of a just-added row (focusing also scrolls it into view)
+  const focusRowIdxRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (focusRowIdxRef.current !== null) {
+      titleInputRefs.current[focusRowIdxRef.current]?.focus();
+      focusRowIdxRef.current = null;
+    }
+  }, [newBooks]);
+
   if (!isOpen) return null;
 
   const handleAddBookRow = () => {
+    focusRowIdxRef.current = newBooks.length;
     setNewBooks([
       ...newBooks,
       {
         name: "",
         author: bookAuthor, // Default to the same author
-        seriesOrder: newBooks.length > 0 ? Math.max(...newBooks.map(b => b.seriesOrder)) + 1 : 1,
+        // Floor so in-between entries like 12.5 still lead to book 13
+        seriesOrder: newBooks.length > 0 ? Math.floor(Math.max(...newBooks.map(b => b.seriesOrder))) + 1 : 1,
         status: "Unread",
       },
     ]);
@@ -191,7 +289,7 @@ export default function SeriesManager({
       <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-lg w-full max-w-xl shadow-2xl relative my-8 text-zinc-100 max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="mb-5 pb-3 border-b border-zinc-800">
+        <div className="mb-5 pb-3 border-b border-zinc-800 shrink-0">
           <h3 className="text-base font-bold uppercase tracking-wider text-zinc-100 font-serif leading-tight">
             Manage Series
           </h3>
@@ -200,11 +298,11 @@ export default function SeriesManager({
           </p>
         </div>
 
-        {/* Scrollable Form Area */}
-        <div className="flex-grow overflow-y-auto pr-1 space-y-4 text-xs">
+        {/* Form Area: only scrolls if the fixed fields plus the minimum book list height don't fit */}
+        <div className="min-h-0 overflow-y-auto pr-1 space-y-4 text-xs flex flex-col">
           
           {/* Series Selection */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 shrink-0">
             <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
               Series Name
             </label>
@@ -226,7 +324,7 @@ export default function SeriesManager({
 
           {/* New Series Input */}
           {selectedSeriesId === "new" && (
-            <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-150">
+            <div className="space-y-1.5 shrink-0 animate-in slide-in-from-top-1 duration-150">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                 New Series Name
               </label>
@@ -244,7 +342,7 @@ export default function SeriesManager({
 
           {/* Order Input */}
           {selectedSeriesId && (
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 shrink-0">
               <label className="block text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                 Position / Order in Series (e.g. 3, 1.5)
               </label>
@@ -262,8 +360,8 @@ export default function SeriesManager({
 
           {/* Add Prequels / Sequels Section */}
           {selectedSeriesId && (
-            <div className="pt-4 border-t border-zinc-800 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="pt-4 border-t border-zinc-800 min-h-0 flex flex-col gap-3">
+              <div className="flex items-center justify-between shrink-0">
                 <div>
                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
                     Add Prequels, Sequels or Other Books in this Series
@@ -284,7 +382,12 @@ export default function SeriesManager({
 
               {/* Dynamic Rows */}
               {newBooks.length > 0 && (
-                <div className="space-y-3 bg-zinc-950/40 border border-zinc-850 p-3 rounded max-h-60 overflow-y-auto">
+                <div
+                  className={`space-y-3 bg-zinc-950/40 border border-zinc-850 p-3 rounded overflow-y-auto ${
+                    // Keep at least ~2 rows visible before the form area itself has to scroll
+                    newBooks.length > 1 ? "min-h-32" : "shrink-0"
+                  }`}
+                >
                   {newBooks.map((book, idx) => (
                     <div key={idx} className="flex flex-col sm:flex-row gap-2.5 items-end border-b border-zinc-900 pb-3 last:border-0 last:pb-0">
                       
@@ -292,6 +395,9 @@ export default function SeriesManager({
                       <div className="flex-grow w-full space-y-1 relative">
                         <label className="block text-[8px] font-bold uppercase tracking-wider text-zinc-500">Title</label>
                         <input
+                          ref={(el) => {
+                            titleInputRefs.current[idx] = el;
+                          }}
                           type="text"
                           value={book.name}
                           onChange={(e) => handleTitleInputChange(idx, e.target.value)}
@@ -323,19 +429,12 @@ export default function SeriesManager({
                           className="w-full bg-zinc-900 border border-zinc-800 focus:outline-none focus:border-zinc-750 rounded px-2.5 py-1.5 text-xs text-zinc-200 transition-colors"
                         />
                         {book.showDropdown && book.searchResults && book.searchResults.length > 0 && (
-                          <div className="absolute left-0 right-0 mt-1 bg-zinc-950 border border-zinc-800 rounded shadow-lg max-h-36 overflow-y-auto z-50">
-                            {book.searchResults.map((match) => (
-                              <button
-                                key={match.id}
-                                type="button"
-                                onClick={() => handleSelectAutocomplete(idx, match)}
-                                className="w-full text-left px-2.5 py-1.5 hover:bg-zinc-850 text-xs text-zinc-300 hover:text-white transition-colors border-b border-zinc-900/60 last:border-0 truncate flex flex-col cursor-pointer"
-                              >
-                                <span className="font-bold">{match.name}</span>
-                                <span className="text-[10px] text-zinc-500 block">by {match.author}</span>
-                              </button>
-                            ))}
-                          </div>
+                          <TitleSuggestions
+                            inputRefs={titleInputRefs}
+                            index={idx}
+                            results={book.searchResults}
+                            onSelect={(match) => handleSelectAutocomplete(idx, match)}
+                          />
                         )}
                       </div>
 
@@ -408,7 +507,7 @@ export default function SeriesManager({
         </div>
 
         {/* Action Buttons */}
-        <div className="mt-6 pt-3 border-t border-zinc-800 flex justify-end gap-3">
+        <div className="mt-6 pt-3 border-t border-zinc-800 flex justify-end gap-3 shrink-0">
           <button
             type="button"
             onClick={onClose}
